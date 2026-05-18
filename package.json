@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "tsx scripts/migrate.ts && tsx scripts/seed-admin.ts && next build",
-    "start": "next start",
+    "build": "next build",
+    "start": "tsx scripts/migrate.ts && tsx scripts/seed-admin.ts && next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
