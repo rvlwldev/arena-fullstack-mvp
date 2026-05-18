@@ -1,4 +1,9 @@
-type Channel = Set<WritableStreamDefaultWriter<Uint8Array>>
+type Channel = Set<SseClient>
+
+export interface SseClient {
+  send(event: string, data: unknown): void
+  close(): void
+}
 
 declare global {
   var __sseChannels: Map<string, Channel> | undefined
@@ -7,40 +12,26 @@ declare global {
 const channels: Map<string, Channel> = globalThis.__sseChannels ?? new Map()
 globalThis.__sseChannels = channels
 
-const encoder = new TextEncoder()
-
-export function subscribe(
-  issueId: string,
-  writer: WritableStreamDefaultWriter<Uint8Array>,
-  signal: AbortSignal,
-) {
+export function subscribe(issueId: string, client: SseClient, signal: AbortSignal) {
   const set = channels.get(issueId) ?? new Set()
-  set.add(writer)
+  set.add(client)
   channels.set(issueId, set)
-
-  const cleanup = () => {
-    set.delete(writer)
+  signal.addEventListener('abort', () => {
+    set.delete(client)
     if (set.size === 0) channels.delete(issueId)
-  }
-
-  signal.addEventListener('abort', cleanup)
+  })
 }
 
-export async function broadcast(issueId: string, event: string, data: unknown) {
+export function broadcast(issueId: string, event: string, data: unknown) {
   const set = channels.get(issueId)
   if (!set || set.size === 0) return
-  const payload = encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-  const dead: WritableStreamDefaultWriter<Uint8Array>[] = []
-  await Promise.all(
-    Array.from(set).map(async (w) => {
-      try {
-        await w.write(payload)
-      } catch {
-        dead.push(w)
-      }
-    }),
-  )
-  for (const w of dead) set.delete(w)
+  for (const c of set) {
+    try {
+      c.send(event, data)
+    } catch {
+      set.delete(c)
+    }
+  }
 }
 
 export function subscriberCount(issueId: string): number {
