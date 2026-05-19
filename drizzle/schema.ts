@@ -1,10 +1,10 @@
+import { sql } from 'drizzle-orm'
 import {
   pgEnum,
   pgTable,
   uuid,
   text,
   timestamp,
-  smallint,
   bigserial,
   jsonb,
   uniqueIndex,
@@ -22,6 +22,7 @@ export const issueStatus = pgEnum('issue_status', [
 export const sideEnum = pgEnum('side', ['left', 'right'])
 export const winnerSide = pgEnum('winner_side', ['left', 'right', 'TIE'])
 export const sanctionType = pgEnum('sanction_type', ['BAN'])
+export const reactionKind = pgEnum('reaction_kind', ['empathy', 'dopamine'])
 
 export const users = pgTable(
   'users',
@@ -99,23 +100,27 @@ export const replies = pgTable(
   }),
 )
 
-export const votes = pgTable(
-  'votes',
+export const reactions = pgTable(
+  'reactions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    commentId: uuid('comment_id')
-      .notNull()
-      .references(() => comments.id, { onDelete: 'cascade' }),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    value: smallint('value').notNull(),
+    commentId: uuid('comment_id').references(() => comments.id, { onDelete: 'cascade' }),
+    replyId: uuid('reply_id').references(() => replies.id, { onDelete: 'cascade' }),
+    kind: reactionKind('kind').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    commentUserUq: uniqueIndex('votes_comment_user_uq').on(t.commentId, t.userId),
-    commentIdx: index('votes_comment_idx').on(t.commentId),
+    commentUserKindUq: uniqueIndex('reactions_comment_user_kind_uq')
+      .on(t.commentId, t.userId, t.kind)
+      .where(sql`${t.commentId} IS NOT NULL`),
+    replyUserKindUq: uniqueIndex('reactions_reply_user_kind_uq')
+      .on(t.replyId, t.userId, t.kind)
+      .where(sql`${t.replyId} IS NOT NULL`),
+    commentIdx: index('reactions_comment_idx').on(t.commentId),
+    replyIdx: index('reactions_reply_idx').on(t.replyId),
   }),
 )
 
@@ -198,7 +203,8 @@ export type NewIssue = typeof issues.$inferInsert
 export type Comment = typeof comments.$inferSelect
 export type Reply = typeof replies.$inferSelect
 export type NewReply = typeof replies.$inferInsert
-export type Vote = typeof votes.$inferSelect
+export type Reaction = typeof reactions.$inferSelect
+export type NewReaction = typeof reactions.$inferInsert
 export type Chat = typeof chats.$inferSelect
 export type Sanction = typeof sanctions.$inferSelect
 export type IssueResult = typeof issueResults.$inferSelect
