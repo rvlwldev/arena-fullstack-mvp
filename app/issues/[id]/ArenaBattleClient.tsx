@@ -895,7 +895,7 @@ function CommentCard({
           <button
             type="button"
             onClick={() => react('empathy')}
-            className="rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
+            className="whitespace-nowrap rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
           >
             공감 {c.empathy}
           </button>
@@ -903,7 +903,7 @@ function CommentCard({
             <button
               type="button"
               onClick={() => react('dopamine')}
-              className="rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
+              className="whitespace-nowrap rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
             >
               도파민 {c.dopamine}
             </button>
@@ -917,7 +917,7 @@ function CommentCard({
                 setExpanded(true)
                 if (!repliesLoaded) loadReplies()
               }}
-              className="rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
+              className="whitespace-nowrap rounded bg-white/6 px-2 py-0.5 text-[10px] font-black text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/12"
             >
               반박하기
             </button>
@@ -939,7 +939,7 @@ function CommentCard({
         <button
           type="button"
           onClick={toggleExpand}
-          className="mt-2 text-[10px] font-black text-white/45 hover:text-white/70"
+          className="mt-2 whitespace-nowrap text-[10px] font-black text-white/45 hover:text-white/70"
         >
           {expanded ? '답글 숨기기' : `답글 ${countAllReplies(replies) || c.rebuttal}개 보기`}
         </button>
@@ -1080,7 +1080,7 @@ function ReplyCard({
           <button
             type="button"
             onClick={() => react('empathy')}
-            className="rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
+            className="whitespace-nowrap rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
           >
             공감
           </button>
@@ -1089,14 +1089,14 @@ function ReplyCard({
               <button
                 type="button"
                 onClick={() => react('dopamine')}
-                className="rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
+                className="whitespace-nowrap rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
               >
                 도파민
               </button>
               <button
                 type="button"
                 onClick={() => setOpenReply((v) => !v)}
-                className="rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
+                className="whitespace-nowrap rounded bg-white/6 px-1.5 py-px text-[9px] font-black text-white/65 ring-1 ring-inset ring-white/10"
               >
                 답글
               </button>

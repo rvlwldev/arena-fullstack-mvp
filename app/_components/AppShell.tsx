@@ -46,7 +46,7 @@ function AppShellInner({ children, wide }: { children: ReactNode; wide: boolean 
                 {me.role === 'ADMIN' && (
                   <Link
                     href="/admin"
-                    className="rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
+                    className="whitespace-nowrap rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
                   >
                     운영
                   </Link>
@@ -56,7 +56,7 @@ function AppShellInner({ children, wide }: { children: ReactNode; wide: boolean 
                 <button
                   type="button"
                   onClick={logout}
-                  className="rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
+                  className="whitespace-nowrap rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
                 >
                   로그아웃
                 </button>
@@ -65,13 +65,13 @@ function AppShellInner({ children, wide }: { children: ReactNode; wide: boolean 
               <>
                 <Link
                   href="/login"
-                  className="rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
+                  className="whitespace-nowrap rounded border border-white/15 bg-white/5 px-2.5 py-1 text-white/80 hover:bg-white/10"
                 >
                   로그인
                 </Link>
                 <Link
                   href="/signup"
-                  className="rounded bg-gradient-to-r from-[var(--arena-red)] to-[var(--arena-blue)] px-2.5 py-1 text-white"
+                  className="whitespace-nowrap rounded bg-gradient-to-r from-[var(--arena-red)] to-[var(--arena-blue)] px-2.5 py-1 text-white"
                 >
                   가입
                 </Link>
@@ -99,7 +99,7 @@ function BanCountdownPill({ expiresAt, memo }: { expiresAt: string; memo: string
   return (
     <span
       title={memo ? `사유: ${memo}` : '이용 정지 중'}
-      className="rounded border border-[var(--arena-red)]/40 bg-[var(--arena-red)]/15 px-2 py-1 font-black text-[var(--arena-red)]"
+      className="whitespace-nowrap rounded border border-[var(--arena-red)]/40 bg-[var(--arena-red)]/15 px-2 py-1 font-black text-[var(--arena-red)]"
     >
       🚫 {text}
     </span>

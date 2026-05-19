@@ -213,7 +213,7 @@ function Pagination({
           key={p}
           type="button"
           onClick={() => onChange(p)}
-          className={`h-8 min-w-8 rounded-md px-2 text-xs font-black transition ${
+          className={`h-8 min-w-8 whitespace-nowrap rounded-md px-2 text-xs font-black transition ${
             p === page
               ? 'bg-white text-neutral-900'
               : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'

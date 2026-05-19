@@ -82,7 +82,7 @@ export function BanActionModal({ target, defaultMemo, onClose, onApplied }: Prop
                     setUnit(p.unit)
                     setValue(p.value)
                   }}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-black transition ${
+                  className={`whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-black transition ${
                     unit === p.unit && value === p.value
                       ? 'border-[var(--arena-red)] bg-[var(--arena-red)]/20 text-white'
                       : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'

@@ -115,7 +115,7 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-t-md px-3 py-1.5 text-xs font-black transition ${
+      className={`whitespace-nowrap rounded-t-md px-3 py-1.5 text-xs font-black transition ${
         active ? 'bg-white/12 text-white ring-1 ring-white/20' : 'text-white/55 hover:bg-white/5'
       }`}
     >
