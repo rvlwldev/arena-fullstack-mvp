@@ -49,7 +49,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       closesAt: issue.closesAt,
       resultAt: issue.resultAt,
     })
-    if (status !== 'ACTIVE') return fail(409, '채팅 가능한 시간이 아닙니다.')
+    // V2.G: RESULT 상태에서도 채팅은 허용 (의견·반응만 잠금)
+    if (status !== 'ACTIVE' && status !== 'RESULT') {
+      return fail(409, '채팅 가능한 시간이 아닙니다.')
+    }
 
     const [row] = await db
       .insert(schema.chats)
