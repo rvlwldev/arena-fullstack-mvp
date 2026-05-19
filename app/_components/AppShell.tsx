@@ -4,23 +4,21 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Logo } from './Logo'
-
-interface Me {
-  id: string
-  nickname: string
-  role: 'USER' | 'ADMIN'
-}
+import { BanNoticeModal } from './BanNoticeModal'
+import { MeProvider, useMe } from './MeContext'
+import { remainingHumanKR } from '@/app/_lib/format'
 
 export function AppShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  const router = useRouter()
-  const [me, setMe] = useState<Me | null>(null)
+  return (
+    <MeProvider>
+      <AppShellInner wide={wide}>{children}</AppShellInner>
+    </MeProvider>
+  )
+}
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then((d) => setMe(d.user))
-      .catch(() => setMe(null))
-  }, [])
+function AppShellInner({ children, wide }: { children: ReactNode; wide: boolean }) {
+  const router = useRouter()
+  const { me, setMe } = useMe()
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -53,6 +51,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
                     운영
                   </Link>
                 )}
+                {me.ban && <BanCountdownPill expiresAt={me.ban.expiresAt} memo={me.ban.memo} />}
                 <span className="hidden text-white/60 sm:inline">{me.nickname}</span>
                 <button
                   type="button"
@@ -85,6 +84,24 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
       <main className={`relative z-10 mx-auto w-full ${widthCls} px-4 py-6 sm:px-6 sm:py-8`}>
         {children}
       </main>
+
+      {me && me.ban && <BanNoticeModal ban={me.ban} userId={me.id} />}
     </div>
+  )
+}
+
+function BanCountdownPill({ expiresAt, memo }: { expiresAt: string; memo: string | null }) {
+  const [text, setText] = useState(() => remainingHumanKR(expiresAt))
+  useEffect(() => {
+    const id = window.setInterval(() => setText(remainingHumanKR(expiresAt)), 30_000)
+    return () => window.clearInterval(id)
+  }, [expiresAt])
+  return (
+    <span
+      title={memo ? `사유: ${memo}` : '이용 정지 중'}
+      className="rounded border border-[var(--arena-red)]/40 bg-[var(--arena-red)]/15 px-2 py-1 font-black text-[var(--arena-red)]"
+    >
+      🚫 {text}
+    </span>
   )
 }
