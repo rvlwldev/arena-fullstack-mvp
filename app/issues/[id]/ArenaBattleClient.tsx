@@ -74,7 +74,14 @@ interface ResultPayload {
 
 interface Props {
   issue: IssueProp
-  me: { id: string; nickname: string; role: 'USER' | 'ADMIN' } | null
+  me:
+    | {
+        id: string
+        nickname: string
+        role: 'USER' | 'ADMIN'
+        ban: { expiresAt: string; memo: string | null } | null
+      }
+    | null
 }
 
 const ROLE_STORAGE_KEY = 'bbalparena-side'
@@ -264,6 +271,7 @@ export function ArenaBattleClient({ issue, me }: Props) {
   const sendChat = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!chatBody.trim() || !me) return
+    if (me.ban) return alert('이용 정지 중이라 채팅 송신 불가')
     if (role === 'spectator') return alert('눈팅충은 채팅 못 단다. 진영부터 골라라.')
     const body = chatBody.trim()
     setChatBody('')
@@ -375,7 +383,7 @@ export function ArenaBattleClient({ issue, me }: Props) {
           </Card>
         )}
 
-        {me && isActive && !myComment && role !== 'spectator' && (
+        {me && !me.ban && isActive && !myComment && role !== 'spectator' && (
           <CommentForm
             issueId={issue.id}
             role={role}
@@ -431,7 +439,7 @@ export function ArenaBattleClient({ issue, me }: Props) {
                 ))
               )}
             </div>
-            {me && (isActive || isResult) && role !== 'spectator' ? (
+            {me && !me.ban && (isActive || isResult) && role !== 'spectator' ? (
               <form onSubmit={sendChat} className="flex gap-2 p-3">
                 <Input
                   placeholder={isResult ? '결과 발표 채팅 ㄱㄱ' : '한 줄 박아라'}
@@ -445,7 +453,13 @@ export function ArenaBattleClient({ issue, me }: Props) {
               </form>
             ) : (
               <p className="p-3 text-xs font-bold text-white/45">
-                {!me ? '로그인하면 채팅 가능' : role === 'spectator' ? '눈팅충은 채팅 불가' : '채팅 불가'}
+                {!me
+                  ? '로그인하면 채팅 가능'
+                  : me.ban
+                  ? '🚫 이용 정지 중 — 보기만 가능'
+                  : role === 'spectator'
+                  ? '눈팅충은 채팅 불가'
+                  : '채팅 불가'}
               </p>
             )}
           </Card>
@@ -742,6 +756,7 @@ function CommentCard({
 
   const react = async (kind: 'empathy' | 'dopamine') => {
     if (!me) return alert('로그인 필요')
+    if (me.ban) return alert('이용 정지 중이라 반응 불가')
     if (mine) return alert('본인 의견에는 반응 불가')
     if (kind === 'dopamine' && isSpectator) return alert('눈팅충은 도파민 불가')
     const res = await fetch(`/api/comments/${c.id}/reactions`, {
@@ -757,6 +772,7 @@ function CommentCard({
 
   const submitReply = async () => {
     if (!me) return alert('로그인 필요')
+    if (me.ban) return alert('이용 정지 중이라 답글 불가')
     if (isSpectator) return alert('눈팅충은 답글 불가')
     if (!replyDraft.trim()) return
     const res = await fetch(`/api/comments/${c.id}/replies`, {
@@ -996,6 +1012,7 @@ function ReplyCard({
 
   const react = async (kind: 'empathy' | 'dopamine') => {
     if (!me) return alert('로그인 필요')
+    if (me.ban) return alert('이용 정지 중이라 반응 불가')
     if (mine) return alert('본인 답글에는 반응 불가')
     if (kind === 'dopamine' && isSpectator) return alert('눈팅충은 도파민 불가')
     const res = await fetch(`/api/replies/${node.id}/reactions`, {
@@ -1011,6 +1028,7 @@ function ReplyCard({
 
   const submitReply = async () => {
     if (!me || isSpectator) return
+    if (me.ban) return alert('이용 정지 중이라 답글 불가')
     if (!draft.trim()) return
     const res = await fetch(`/api/comments/${node.commentId}/replies`, {
       method: 'POST',

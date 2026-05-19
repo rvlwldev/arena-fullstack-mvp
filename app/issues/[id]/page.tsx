@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import { db, schema } from '@/app/_lib/db'
 import { deriveIssueStatus } from '@/app/_lib/domain/issue-status'
-import { getCurrentUser } from '@/app/_lib/auth/session'
+import { activeBan, getCurrentUser } from '@/app/_lib/auth/session'
 import { ArenaBattleClient } from './ArenaBattleClient'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +20,7 @@ export default async function IssuePage({ params }: { params: Promise<{ id: stri
   if (issue.status === 'DRAFT' || issue.status === 'ARCHIVED' || issue.status === 'CLEANED') notFound()
   const derivedStatus = deriveIssueStatus(new Date(), issue)
   const me = await getCurrentUser()
+  const ban = me ? await activeBan(me.id) : null
 
   return (
     <ArenaBattleClient
@@ -36,7 +37,21 @@ export default async function IssuePage({ params }: { params: Promise<{ id: stri
         status: issue.status,
         derivedStatus,
       }}
-      me={me}
+      me={
+        me
+          ? {
+              id: me.id,
+              nickname: me.nickname,
+              role: me.role,
+              ban: ban
+                ? {
+                    expiresAt: ban.expiresAt.toISOString(),
+                    memo: ban.memo,
+                  }
+                : null,
+            }
+          : null
+      }
     />
   )
 }
