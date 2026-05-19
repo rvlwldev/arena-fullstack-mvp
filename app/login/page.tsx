@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState } from 'react'
+import { AppShell } from '../_components/AppShell'
 import { Button, Card, Input } from '../_components/ui'
 
 export default function LoginPage() {
@@ -32,24 +33,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <h1 className="text-xl font-semibold">로그인</h1>
-        <form onSubmit={submit} className="mt-5 space-y-3">
-          <Input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input type="password" placeholder="비밀번호" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? '로그인 중...' : '로그인'}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-neutral-600">
-          계정이 없으신가요?{' '}
-          <Link href="/signup" className="font-medium underline">
-            가입하기
-          </Link>
-        </p>
-      </Card>
-    </div>
+    <AppShell>
+      <div className="mx-auto mt-6 max-w-md">
+        <Card>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">LOGIN</p>
+          <h1 className="mt-2 text-2xl font-black text-white">전장에 복귀한다</h1>
+          <form onSubmit={submit} className="mt-5 space-y-3">
+            <Input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              type="password"
+              placeholder="비밀번호"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {err && <p className="text-xs font-bold text-[var(--arena-red)]">{err}</p>}
+            <Button type="submit" variant="gradient" disabled={loading} className="w-full">
+              {loading ? '로그인 중...' : '입장'}
+            </Button>
+          </form>
+          <p className="mt-4 text-center text-xs font-bold text-white/55">
+            처음이야?{' '}
+            <Link href="/signup" className="text-white underline">
+              가입하기
+            </Link>
+          </p>
+        </Card>
+      </div>
+    </AppShell>
   )
 }
