@@ -76,6 +76,29 @@ export const comments = pgTable(
   }),
 )
 
+export const replies = pgTable(
+  'replies',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    commentId: uuid('comment_id')
+      .notNull()
+      .references(() => comments.id, { onDelete: 'cascade' }),
+    parentReplyId: uuid('parent_reply_id'),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    side: sideEnum('side').notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({
+    commentCreatedIdx: index('replies_comment_created_idx').on(t.commentId, t.createdAt),
+    parentIdx: index('replies_parent_idx').on(t.parentReplyId),
+  }),
+)
+
 export const votes = pgTable(
   'votes',
   {
@@ -173,6 +196,8 @@ export type NewUser = typeof users.$inferInsert
 export type Issue = typeof issues.$inferSelect
 export type NewIssue = typeof issues.$inferInsert
 export type Comment = typeof comments.$inferSelect
+export type Reply = typeof replies.$inferSelect
+export type NewReply = typeof replies.$inferInsert
 export type Vote = typeof votes.$inferSelect
 export type Chat = typeof chats.$inferSelect
 export type Sanction = typeof sanctions.$inferSelect
