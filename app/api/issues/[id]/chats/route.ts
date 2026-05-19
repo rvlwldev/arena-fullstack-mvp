@@ -68,12 +68,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .values({ issueId: id, userId: user.id, body: body.body })
       .returning()
 
-    await broadcast(id, 'chat', {
+    // 송신자 본인 ban은 mutation 통과 시점이라 없음. 다만 다른 동시 사용자들의 ban 정보는
+    // 채팅 GET 응답에 있으므로, 새 메시지 broadcast에서는 작성자의 ban=null로 명시
+    broadcast(id, 'chat', {
       id: row.id,
       userId: row.userId,
       nickname: user.nickname,
       body: row.body,
       createdAt: row.createdAt,
+      ban: null,
     })
 
     return created({ chat: row })

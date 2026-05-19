@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Logo } from '@/app/_components/Logo'
 import { Button, Card, Pill, StatNumber, StatusBadge, Textarea, Input } from '@/app/_components/ui'
 import { RoleBadge, TeamPill } from '@/app/_components/TeamPill'
-import { elapsedSecondsSince, formatCountKR, formatHHMMSS } from '@/app/_lib/format'
+import { elapsedSecondsSince, formatCountKR, formatHHMMSS, remainingHumanKR } from '@/app/_lib/format'
 import { rebuttalLabel } from '@/app/_lib/domain/score'
 
 type Side = 'left' | 'right'
@@ -64,6 +64,7 @@ interface ChatRow {
   nickname: string
   body: string
   createdAt: string
+  ban?: { expiresAt: string; memo: string | null } | null
 }
 
 interface ResultPayload {
@@ -433,6 +434,14 @@ export function ArenaBattleClient({ issue, me }: Props) {
                 chats.map((c) => (
                   <p key={c.id} className="mb-1 text-sm">
                     <span className="font-black text-white/90">{c.nickname}</span>
+                    {c.ban && (
+                      <span
+                        title={c.ban.memo ? `사유: ${c.ban.memo}` : '이용 정지 중'}
+                        className="ml-1 inline-flex items-center rounded border border-[var(--arena-red)]/40 bg-[var(--arena-red)]/15 px-1 py-px text-[9px] font-black text-[var(--arena-red)] align-middle"
+                      >
+                        🚫 {remainingHumanKR(c.ban.expiresAt)}
+                      </span>
+                    )}
                     <span className="text-white/30"> : </span>
                     <span className="font-bold text-white/80">{c.body}</span>
                   </p>
