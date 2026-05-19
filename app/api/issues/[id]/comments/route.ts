@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db, schema } from '@/app/_lib/db'
 import { requireUser } from '@/app/_lib/auth/session'
 import { handle, fail, created, ok } from '@/app/_lib/http'
@@ -16,57 +16,46 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return handle(async () => {
     const { id } = await ctx.params
     const url = new URL(req.url)
-    const side = url.searchParams.get('side') as 'left' | 'right' | null
+    const side = url.searchParams.get('side')
     const sort = url.searchParams.get('sort') ?? 'score'
 
-    const conditions = [eq(schema.comments.issueId, id), isNull(schema.comments.deletedAt)]
-    if (side === 'left' || side === 'right') conditions.push(eq(schema.comments.side, side))
+    const sideFilter = side === 'left' || side === 'right' ? side : null
 
-    const empathySql = sql<number>`(
-      SELECT COUNT(*)::int FROM ${schema.reactions} r
-      WHERE r.comment_id = ${schema.comments.id} AND r.kind = 'empathy'
-    )`
-    const dopamineSql = sql<number>`(
-      SELECT COUNT(*)::int FROM ${schema.reactions} r
-      WHERE r.comment_id = ${schema.comments.id} AND r.kind = 'dopamine'
-    )`
-    const rebuttalSql = sql<number>`(
-      SELECT COUNT(DISTINCT rp.user_id)::int FROM ${schema.replies} rp
-      WHERE rp.comment_id = ${schema.comments.id}
-        AND rp.parent_reply_id IS NULL
-        AND rp.deleted_at IS NULL
-    )`
+    const result = await db.execute(sql`
+      SELECT
+        c.id, c.user_id, u.nickname, c.side, c.body, c.created_at, c.updated_at,
+        (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'empathy')  AS empathy,
+        (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'dopamine') AS dopamine,
+        (SELECT COUNT(DISTINCT rp.user_id)::int FROM replies rp
+           WHERE rp.comment_id = c.id AND rp.parent_reply_id IS NULL AND rp.deleted_at IS NULL) AS rebuttal
+      FROM comments c
+      JOIN users u ON u.id = c.user_id
+      WHERE c.issue_id = ${id} AND c.deleted_at IS NULL
+        ${sideFilter ? sql`AND c.side = ${sideFilter}` : sql``}
+    `)
 
-    const rows = await db
-      .select({
-        id: schema.comments.id,
-        userId: schema.comments.userId,
-        nickname: schema.users.nickname,
-        side: schema.comments.side,
-        body: schema.comments.body,
-        createdAt: schema.comments.createdAt,
-        updatedAt: schema.comments.updatedAt,
-        empathy: empathySql,
-        dopamine: dopamineSql,
-        rebuttal: rebuttalSql,
+    const withScore = result.rows
+      .map((r) => {
+        const row = r as {
+          id: string; user_id: string; nickname: string; side: 'left' | 'right'; body: string
+          created_at: string | Date; updated_at: string | Date
+          empathy: number; dopamine: number; rebuttal: number
+        }
+        const empathy = Number(row.empathy)
+        const dopamine = Number(row.dopamine)
+        const rebuttal = Number(row.rebuttal)
+        return {
+          id: row.id,
+          userId: row.user_id,
+          nickname: row.nickname,
+          side: row.side,
+          body: row.body,
+          createdAt: new Date(row.created_at),
+          updatedAt: new Date(row.updated_at),
+          empathy, dopamine, rebuttal,
+          score: commentScore({ empathy, dopamine, rebuttal }),
+        }
       })
-      .from(schema.comments)
-      .innerJoin(schema.users, eq(schema.users.id, schema.comments.userId))
-      .where(and(...conditions))
-      .orderBy(sort === 'recent' ? desc(schema.comments.createdAt) : desc(schema.comments.createdAt))
-
-    const withScore = rows
-      .map((r) => ({
-        ...r,
-        empathy: Number(r.empathy),
-        dopamine: Number(r.dopamine),
-        rebuttal: Number(r.rebuttal),
-        score: commentScore({
-          empathy: Number(r.empathy),
-          dopamine: Number(r.dopamine),
-          rebuttal: Number(r.rebuttal),
-        }),
-      }))
       .sort((a, b) =>
         sort === 'recent'
           ? b.createdAt.getTime() - a.createdAt.getTime()

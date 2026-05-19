@@ -45,39 +45,25 @@ export async function computeResultForIssue(issueId: string) {
  *   rebuttal = unique user_id of replies WHERE comment_id = c.id AND parent_reply_id IS NULL AND deleted_at IS NULL
  */
 export async function aggregateCommentReactions(issueId: string): Promise<CommentReactions[]> {
-  const empathySql = sql<number>`(
-    SELECT COUNT(*)::int FROM ${schema.reactions} r
-    WHERE r.comment_id = ${schema.comments.id} AND r.kind = 'empathy'
-  )`
-  const dopamineSql = sql<number>`(
-    SELECT COUNT(*)::int FROM ${schema.reactions} r
-    WHERE r.comment_id = ${schema.comments.id} AND r.kind = 'dopamine'
-  )`
-  const rebuttalSql = sql<number>`(
-    SELECT COUNT(DISTINCT rp.user_id)::int FROM ${schema.replies} rp
-    WHERE rp.comment_id = ${schema.comments.id}
-      AND rp.parent_reply_id IS NULL
-      AND rp.deleted_at IS NULL
-  )`
+  const result = await db.execute(sql`
+    SELECT
+      c.id AS comment_id,
+      c.side AS side,
+      c.created_at AS created_at,
+      (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'empathy')  AS empathy,
+      (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'dopamine') AS dopamine,
+      (SELECT COUNT(DISTINCT rp.user_id)::int FROM replies rp
+         WHERE rp.comment_id = c.id AND rp.parent_reply_id IS NULL AND rp.deleted_at IS NULL) AS rebuttal
+    FROM comments c
+    WHERE c.issue_id = ${issueId} AND c.deleted_at IS NULL
+  `)
 
-  const rows = await db
-    .select({
-      commentId: schema.comments.id,
-      side: schema.comments.side,
-      createdAt: schema.comments.createdAt,
-      empathy: empathySql,
-      dopamine: dopamineSql,
-      rebuttal: rebuttalSql,
-    })
-    .from(schema.comments)
-    .where(and(eq(schema.comments.issueId, issueId), isNull(schema.comments.deletedAt)))
-
-  return rows.map((r) => ({
-    commentId: r.commentId,
-    side: r.side as 'left' | 'right',
-    createdAt: r.createdAt,
-    empathy: Number(r.empathy),
-    dopamine: Number(r.dopamine),
-    rebuttal: Number(r.rebuttal),
+  return result.rows.map((r) => ({
+    commentId: String((r as { comment_id: string }).comment_id),
+    side: (r as { side: 'left' | 'right' }).side,
+    createdAt: new Date((r as { created_at: string | Date }).created_at),
+    empathy: Number((r as { empathy: number }).empathy),
+    dopamine: Number((r as { dopamine: number }).dopamine),
+    rebuttal: Number((r as { rebuttal: number }).rebuttal),
   }))
 }
