@@ -19,8 +19,8 @@ export const issueStatus = pgEnum('issue_status', [
   'ARCHIVED',
   'CLEANED',
 ])
-export const sideEnum = pgEnum('side', ['A', 'B'])
-export const winnerSide = pgEnum('winner_side', ['A', 'B', 'TIE'])
+export const sideEnum = pgEnum('side', ['left', 'right'])
+export const winnerSide = pgEnum('winner_side', ['left', 'right', 'TIE'])
 export const sanctionType = pgEnum('sanction_type', ['BAN'])
 
 export const users = pgTable(

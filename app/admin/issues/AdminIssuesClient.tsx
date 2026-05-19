@@ -140,7 +140,7 @@ function IssueEditCard({ row, onChanged, onRemove }: { row: IssueRow; onChanged:
         <div>
           <h3 className="font-semibold">{row.title}</h3>
           <p className="mt-1 text-sm text-neutral-600">
-            <Pill tone="A">{row.sideALabel}</Pill> vs <Pill tone="B">{row.sideBLabel}</Pill>
+            <Pill tone="left">{row.sideALabel}</Pill> vs <Pill tone="right">{row.sideBLabel}</Pill>
           </p>
           <p className="mt-1 text-xs text-neutral-500">
             opens: {new Date(row.opensAt).toLocaleString()} / closes: {new Date(row.closesAt).toLocaleString()} / result: {new Date(row.resultAt).toLocaleString()}

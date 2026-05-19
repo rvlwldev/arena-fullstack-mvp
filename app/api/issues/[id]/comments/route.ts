@@ -7,7 +7,7 @@ import { deriveIssueStatus } from '@/app/_lib/domain/issue-status'
 import { broadcast } from '@/app/_lib/sse-hub'
 
 const createSchema = z.object({
-  side: z.enum(['A', 'B']),
+  side: z.enum(['left', 'right']),
   body: z.string().min(1).max(2000),
 })
 
@@ -15,11 +15,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return handle(async () => {
     const { id } = await ctx.params
     const url = new URL(req.url)
-    const side = url.searchParams.get('side') as 'A' | 'B' | null
+    const side = url.searchParams.get('side') as 'left' | 'right' | null
     const sort = url.searchParams.get('sort') ?? 'score'
 
     const conditions = [eq(schema.comments.issueId, id), isNull(schema.comments.deletedAt)]
-    if (side === 'A' || side === 'B') conditions.push(eq(schema.comments.side, side))
+    if (side === 'left' || side === 'right') conditions.push(eq(schema.comments.side, side))
 
     const likesSql = sql<number>`COALESCE(SUM(CASE WHEN ${schema.votes.value} = 1 THEN 1 ELSE 0 END), 0)::int`
     const dislikesSql = sql<number>`COALESCE(SUM(CASE WHEN ${schema.votes.value} = -1 THEN 1 ELSE 0 END), 0)::int`

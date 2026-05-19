@@ -37,7 +37,7 @@ export default async function HomePage() {
                       <div>
                         <h2 className="text-lg font-semibold">{r.title}</h2>
                         <p className="mt-1 text-sm text-neutral-600">
-                          <Pill tone="A">{r.sideALabel}</Pill> vs <Pill tone="B">{r.sideBLabel}</Pill>
+                          <Pill tone="left">{r.sideALabel}</Pill> vs <Pill tone="right">{r.sideBLabel}</Pill>
                         </p>
                       </div>
                       <Pill tone="neutral">{status}</Pill>

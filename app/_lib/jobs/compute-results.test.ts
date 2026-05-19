@@ -72,9 +72,9 @@ describe('computeResultForIssue (DB)', () => {
     const [a1, a2, b1] = await db
       .insert(schema.comments)
       .values([
-        { issueId: issue.id, userId: u1.id, side: 'A', body: 'A1' },
-        { issueId: issue.id, userId: u2.id, side: 'A', body: 'A2' },
-        { issueId: issue.id, userId: u3.id, side: 'B', body: 'B1' },
+        { issueId: issue.id, userId: u1.id, side: 'left', body: 'A1' },
+        { issueId: issue.id, userId: u2.id, side: 'left', body: 'A2' },
+        { issueId: issue.id, userId: u3.id, side: 'right', body: 'B1' },
       ])
       .returning()
 
@@ -119,7 +119,7 @@ describe('computeResultForIssue (DB)', () => {
       })
       .returning()
 
-    await db.insert(schema.comments).values({ issueId: issue.id, userId: u1.id, side: 'A', body: 'A' })
+    await db.insert(schema.comments).values({ issueId: issue.id, userId: u1.id, side: 'left', body: 'A' })
 
     const { computeResultForIssue } = await import('./compute-results')
     await computeResultForIssue(issue.id)

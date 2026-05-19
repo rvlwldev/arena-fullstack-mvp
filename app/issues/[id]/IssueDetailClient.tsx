@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Card, Pill, Textarea, Input } from '@/app/_components/ui'
 
-type Side = 'A' | 'B'
+type Side = 'left' | 'right'
 type IssueStatus = 'DRAFT' | 'ACTIVE' | 'RESULT' | 'ARCHIVED' | 'CLEANED'
 
 interface IssueProp {
@@ -42,7 +42,7 @@ interface ChatRow {
 }
 
 interface ResultPayload {
-  winnerSide: 'A' | 'B' | 'TIE'
+  winnerSide: 'left' | 'right' | 'TIE'
   sideATop3: Array<{ commentId: string; score: number; likes: number; dislikes: number }>
   sideBTop3: Array<{ commentId: string; score: number; likes: number; dislikes: number }>
 }
@@ -121,8 +121,8 @@ export function IssueDetailClient({ issue, me }: Props) {
     chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight })
   }, [chats.length])
 
-  const sideA = useMemo(() => comments.filter((c) => c.side === 'A').sort((x, y) => y.score - x.score), [comments])
-  const sideB = useMemo(() => comments.filter((c) => c.side === 'B').sort((x, y) => y.score - x.score), [comments])
+  const sideA = useMemo(() => comments.filter((c) => c.side === 'left').sort((x, y) => y.score - x.score), [comments])
+  const sideB = useMemo(() => comments.filter((c) => c.side === 'right').sort((x, y) => y.score - x.score), [comments])
 
   const myComment = me ? comments.find((c) => c.userId === me.id) : null
 
@@ -151,11 +151,11 @@ export function IssueDetailClient({ issue, me }: Props) {
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Card>
-            <Pill tone="A">{issue.sideALabel}</Pill>
+            <Pill tone="left">{issue.sideALabel}</Pill>
             <p className="mt-2 text-sm text-neutral-700">{issue.sideASummary}</p>
           </Card>
           <Card>
-            <Pill tone="B">{issue.sideBLabel}</Pill>
+            <Pill tone="right">{issue.sideBLabel}</Pill>
             <p className="mt-2 text-sm text-neutral-700">{issue.sideBSummary}</p>
           </Card>
         </div>
@@ -166,7 +166,7 @@ export function IssueDetailClient({ issue, me }: Props) {
           <h2 className="text-lg font-semibold">결과</h2>
           <p className="mt-1">
             승자:{' '}
-            <Pill tone={result.winnerSide === 'A' ? 'A' : result.winnerSide === 'B' ? 'B' : 'neutral'}>
+            <Pill tone={result.winnerSide === 'left' ? 'left' : result.winnerSide === 'right' ? 'right' : 'neutral'}>
               {result.winnerSide === 'TIE' ? '무승부' : result.winnerSide}
             </Pill>
           </p>
@@ -183,14 +183,14 @@ export function IssueDetailClient({ issue, me }: Props) {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <CommentList
-          side="A"
+          side="left"
           comments={sideA}
           me={me}
           isActive={isActive}
           onChanged={refreshComments}
         />
         <CommentList
-          side="B"
+          side="right"
           comments={sideB}
           me={me}
           isActive={isActive}
@@ -238,7 +238,7 @@ export function IssueDetailClient({ issue, me }: Props) {
 }
 
 function CommentForm({ issueId, onCreated }: { issueId: string; onCreated: () => void }) {
-  const [side, setSide] = useState<Side>('A')
+  const [side, setSide] = useState<Side>('left')
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -269,19 +269,19 @@ function CommentForm({ issueId, onCreated }: { issueId: string; onCreated: () =>
           <Button
             type="button"
             size="sm"
-            variant={side === 'A' ? 'danger' : 'secondary'}
-            onClick={() => setSide('A')}
+            variant={side === 'left' ? 'danger' : 'secondary'}
+            onClick={() => setSide('left')}
           >
-            A 진영
+            좌측 진영
           </Button>
           <Button
             type="button"
             size="sm"
-            variant={side === 'B' ? 'primary' : 'secondary'}
-            onClick={() => setSide('B')}
-            className={side === 'B' ? 'bg-blue-600 hover:bg-blue-700' : undefined}
+            variant={side === 'right' ? 'primary' : 'secondary'}
+            onClick={() => setSide('right')}
+            className={side === 'right' ? 'bg-blue-600 hover:bg-blue-700' : undefined}
           >
-            B 진영
+            우측 진영
           </Button>
         </div>
         <Textarea

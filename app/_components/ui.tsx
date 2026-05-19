@@ -74,12 +74,12 @@ export function Card({ children, className }: { children: React.ReactNode; class
   )
 }
 
-export function Pill({ tone, children }: { tone: 'A' | 'B' | 'neutral'; children: React.ReactNode }) {
+export function Pill({ tone, children }: { tone: 'left' | 'right' | 'neutral'; children: React.ReactNode }) {
   const cls =
-    tone === 'A'
-      ? 'bg-red-100 text-red-700'
-      : tone === 'B'
+    tone === 'left'
       ? 'bg-blue-100 text-blue-700'
+      : tone === 'right'
+      ? 'bg-red-100 text-red-700'
       : 'bg-neutral-100 text-neutral-700'
   return (
     <span className={cx('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', cls)}>

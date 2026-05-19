@@ -43,7 +43,7 @@ export async function computeResultForIssue(issueId: string) {
 
   const cv: CommentVotes[] = rows.map((r) => ({
     commentId: r.commentId,
-    side: r.side as 'A' | 'B',
+    side: r.side as 'left' | 'right',
     likes: Number(r.likes),
     dislikes: Number(r.dislikes),
     createdAt: r.createdAt,
