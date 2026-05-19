@@ -44,7 +44,10 @@ export function AdminUsersClient() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">사용자 관리</h1>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">운영</p>
+        <h1 className="mt-1 text-2xl font-black text-white">사용자 관리</h1>
+      </div>
       <Card>
         <div className="flex gap-2">
           <Input
@@ -53,7 +56,9 @@ export function AdminUsersClient() {
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
           />
-          <Button onClick={search}>검색</Button>
+          <Button variant="secondary" onClick={search}>
+            검색
+          </Button>
         </div>
       </Card>
       <ul className="space-y-2">
@@ -61,17 +66,17 @@ export function AdminUsersClient() {
           <li key={u.id}>
             <Card>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-white">
                     {u.nickname}{' '}
-                    <span className="text-xs font-normal text-neutral-500">{u.email}</span>
+                    <span className="text-[11px] font-bold text-white/45">{u.email}</span>
                   </p>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    {new Date(u.createdAt).toLocaleString()} 가입 · 권한 {u.role}
+                  <p className="mt-0.5 text-[10px] font-bold text-white/45">
+                    {new Date(u.createdAt).toLocaleString()} 가입
                   </p>
                 </div>
-                <div className="flex gap-1">
-                  <Pill tone="neutral">{u.role}</Pill>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Pill tone={u.role === 'ADMIN' ? 'amber' : 'neutral'}>{u.role}</Pill>
                   {u.role !== 'ADMIN' && (
                     <>
                       <Button size="sm" variant="danger" onClick={() => setTarget(u)}>
@@ -117,11 +122,11 @@ function BanModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-semibold">{user.nickname} 밴</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md">
+        <h2 className="text-lg font-black text-white">{user.nickname} 밴</h2>
         <form onSubmit={submit} className="mt-4 space-y-3">
-          <label className="block text-xs text-neutral-600">
+          <label className="block text-[10px] font-black uppercase tracking-widest text-white/45">
             만료 시각
             <Input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} required />
           </label>
@@ -130,6 +135,7 @@ function BanModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             rows={3}
+            maxLength={500}
           />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onClose}>
@@ -140,7 +146,7 @@ function BanModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
             </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }
