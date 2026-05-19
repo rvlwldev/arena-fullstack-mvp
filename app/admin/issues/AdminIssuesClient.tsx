@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { Button, Card, Input, StatusBadge, Textarea } from '@/app/_components/ui'
 import { TeamPill } from '@/app/_components/TeamPill'
@@ -196,7 +197,12 @@ function IssueEditCard({
         </div>
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={row.status} />
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
+            <Link href={`/admin/issues/${row.id}`}>
+              <Button size="sm" variant="secondary">
+                로그
+              </Button>
+            </Link>
             <Button size="sm" variant="secondary" onClick={() => setEditing((v) => !v)}>
               {editing ? '닫기' : '편집'}
             </Button>
