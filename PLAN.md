@@ -1,6 +1,10 @@
 # RED BLUE ARENA — 개발 계획
 
 > REQUIRED.md 기반 MVP 설계 합의안. 이 문서는 구현의 출발점이며, 결정의 근거를 함께 남긴다.
+>
+> **버전**: v1 (초기 합의, 2026-05-18) → **v2 (빨파레나 디자인 도입, 2026-05-19)** ← 이 문서 하단 §V2 참조
+
+---
 
 ## 1. 제약과 전제
 
@@ -357,3 +361,191 @@ NODE_ENV=production
 - 자동 모더레이션 (욕설 필터 등) — 관리자 수동 제재만
 - 자동화 테스트 — MVP 검증 후 결정
 - i18n / 다국어
+
+---
+
+# §V2 — 빨파레나 디자인 도입 (2026-05-19)
+
+> `bbalparena-mvp` 디자인을 기반으로 한 2차 합의안. v1에서 굳힌 백엔드 핵심 정책은 유지하되, **반응 모델 / 답글 구조 / 진영 명명 / 시각 디자인**을 전면 교체한다.
+
+## V2.1 변경 요약
+
+| 영역 | v1 | v2 |
+|------|----|----|
+| 브랜드 | RED BLUE ARENA | **빨파레나** (빨/파/레나 색분리 로고) |
+| 테마 | Tailwind v3 라이트 | **Tailwind v4 다크** (네온 글로우 + scanlines) |
+| 폰트 | 시스템 | **Noto Sans KR** |
+| 진영 enum | `A` / `B` | **`left` / `right`** (DB 마이그레이션) |
+| 사용자 역할 | 비로그인=관람, 로그인=참전 | **left / right / spectator(눈팅충)** 3-way |
+| 반응 | `votes (+1/-1)` 단일 | **`reactions (empathy, dopamine)` 2종 + 답글로 자동 계산되는 rebuttal** |
+| 점수 공식 | `SUM(value)` | **`empathy + uniqueDirectReplyAuthors + dopamine × 5`** |
+| 답글 | 없음 | **트리 구조 replies (무한 깊이)** |
+| 채팅 (RESULT 상태) | 잠금 | **허용** (의견·반응만 잠금) |
+
+## V2.2 도메인 모델 변경
+
+### A. side enum 마이그레이션
+- `pgEnum('side', ['A','B'])` → `pgEnum('side', ['left','right'])`
+- 절차: 새 enum 추가 → 기존 데이터 `A→left, B→right` 변환 → 컬럼 타입 교체 → 옛 enum drop
+- `winnerSide`도 `('A','B','TIE')` → `('left','right','TIE')`
+
+### B. `votes` 폐기, `reactions` 신설
+```sql
+DROP TABLE votes;
+
+CREATE TYPE reaction_kind AS ENUM ('empathy', 'dopamine');
+
+CREATE TABLE reactions (
+  id uuid PK,
+  user_id uuid FK,
+  -- 의견 또는 답글 둘 중 하나만 not null
+  comment_id uuid FK NULL,
+  reply_id uuid FK NULL,
+  kind reaction_kind NOT NULL,
+  created_at timestamptz,
+  CHECK ((comment_id IS NOT NULL) <> (reply_id IS NOT NULL)),
+  UNIQUE(user_id, comment_id, kind) WHERE comment_id IS NOT NULL,
+  UNIQUE(user_id, reply_id, kind)   WHERE reply_id IS NOT NULL
+);
+```
+- 의견·답글 모두에 reactions 가능 (디자인 코드 그대로)
+- (user, target, kind) 유니크 — 다시 누르면 row 삭제(취소)
+
+### C. `replies` 테이블 신설 (트리 구조)
+```sql
+CREATE TABLE replies (
+  id uuid PK,
+  comment_id uuid FK NOT NULL,           -- 루트 의견 (rootId)
+  parent_reply_id uuid FK NULL,          -- null이면 의견에 직접 단 답글
+  user_id uuid FK NOT NULL,
+  side side NOT NULL,
+  body text NOT NULL,
+  created_at timestamptz,
+  updated_at timestamptz,
+  deleted_at timestamptz,
+  INDEX(comment_id, created_at),
+  INDEX(parent_reply_id)
+);
+```
+- 무한 깊이 (부모 참조만 있고 깊이 제한 없음)
+- `rebuttal` 카운트 = **comment에 직접 단 답글의 unique user_id 수** (UI/점수 둘 다 동일 정의)
+
+### D. 점수 공식
+```
+score(comment) = empathy_count + unique_direct_repliers + dopamine_count × 5
+```
+- `unique_direct_repliers`: `SELECT COUNT(DISTINCT user_id) FROM replies WHERE comment_id = ? AND parent_reply_id IS NULL AND deleted_at IS NULL`
+- TOP3 정렬: score DESC, created_at ASC
+- 진영 승자: 진영별 TOP3 score 합 비교
+
+### E. 역할 권한 매트릭스
+| 액션 | left/right | spectator |
+|------|-----------|-----------|
+| 채팅 | ✅ | ❌ |
+| 의견 등록 (1인1회) | ✅ | ❌ |
+| 의견 수정/삭제 (5분 내) | ✅ (본인) | — |
+| 답글 등록 | ✅ | ❌ |
+| empathy(공감) | ✅ | ✅ |
+| dopamine(도파민) | ✅ | ❌ |
+| 본인 의견·답글에 본인 반응 | ❌ | ❌ |
+
+### F. 진영 선택(role) 저장 위치
+- **localStorage 1차** (디자인 그대로): `{ [issueId]: 'left'|'right'|'spectator' }`
+- 다만 mutation API는 서버에서도 검증 필요 → 한 번 의견을 등록하면 `comments.side`가 곧 user의 진영. 그 이후 변경 불가.
+- spectator는 의견이 없으므로 client-side만 의미. 서버는 "의견 없음 + 인증된 사용자"면 어떤 진영의 액션도 허용 가능하나, **답글·의견·dopamine 요청 시 반드시 `side` 필드를 body에 동봉**해 검증.
+
+### G. RESULT 상태 정책 완화
+- v1: `RESULT`면 채팅·의견·투표 모두 잠금
+- v2: **채팅은 허용**, 의견·반응·답글만 잠금
+- 사용자 체류 시간을 늘리는 디자인 의도 반영
+
+## V2.3 API 변경
+
+### 신규/변경
+```
+POST   /api/issues/[id]/comments    { side, body }                       (left/right만)
+POST   /api/comments/[id]/replies   { side, body, parentReplyId? }       (left/right만)
+PATCH  /api/replies/[id]            { body }                             (5분 + ACTIVE)
+DELETE /api/replies/[id]
+
+POST   /api/comments/[id]/reactions { kind: 'empathy'|'dopamine' }       (토글)
+DELETE /api/comments/[id]/reactions?kind=empathy|dopamine                (명시 취소)
+POST   /api/replies/[id]/reactions  { kind: 'empathy'|'dopamine' }       (토글)
+DELETE /api/replies/[id]/reactions?kind=...
+
+# 제거
+DELETE 기존 /api/comments/[id]/vote
+```
+
+### 응답 페이로드 변경
+- comment 조회 시 `{ empathy, dopamine, rebuttal, score, replies: ReplyNode[] }` 형태로 nested 반환 (또는 별도 엔드포인트)
+- SSE 이벤트 종류 확장:
+  - `reaction` { targetType, targetId, empathy, dopamine, score }
+  - `reply`    { type: created|updated|deleted, reply }
+  - `comment`  (기존, 다만 score 공식 변경)
+
+## V2.4 화면 구성
+
+### 라우트
+| 경로 | 내용 |
+|------|------|
+| `/` | 이슈 카드 리스트 (다크 톤). 카테고리 탭 (정치만 active, 나머지는 "준비중" 비활성) |
+| `/issues/[id]` | SideGate (진영 미선택 시) → ArenaBattleClient (CommentBattle + Top3 + Scoreboard) |
+| `/login`, `/signup` | 다크 톤 폼 |
+| `/admin/*` | 기존 풀 CRUD + 밴, 다크 톤 리스킨 |
+
+### 핵심 컴포넌트 (bbalparena-mvp에서 이식)
+- `MobileShell` — 다크 그리드/스캔라인/로고 헤더
+- `TeamPill` — 좌/우 진영 색 칩
+- `ArenaScoreboardStrip` — LIVE + 타이머 + 진영 게이지
+- `ArenaCompactTop3Scoreboard` — 압축 TOP3
+- `Top3FighterCard` — 풀 TOP3 카드 (금/은/동 랭크 스타일)
+- `SideGate` — 진영 선택 게이트
+- `CommentBattle` — 댓글 난장판 + 답글 트리 + 반응 버튼
+- `Logo` — 빨/파/레나 색분리
+
+### 디자인 토큰 (globals.css)
+```css
+:root {
+  --arena-bg: #07070c;
+  --arena-panel: #0f1018;
+  --arena-red: #ff2b4a;        /* 우측 진영 */
+  --arena-blue: #2f7bff;       /* 좌측 진영 */
+  --arena-text: #f4f4f8;
+  --arena-muted: #9aa3b2;
+}
+```
++ `@keyframes` (arena-pulse, hype-shake, live-blink, broadcast-onair-dot, scanlines)
+
+### Tailwind v4 마이그레이션
+- `tailwind.config.ts` 폐기 → `app/globals.css`에 `@import "tailwindcss"` + `@theme inline { ... }`
+- `postcss.config.mjs`: `tailwindcss` → `@tailwindcss/postcss`
+- `@tailwind base/components/utilities` 디렉티브 제거
+
+## V2.5 구현 순서 (제안)
+
+1. **백엔드 마이그레이션 #1**: side enum A/B → left/right (데이터 변환 포함)
+2. **백엔드 스키마 #2**: replies 테이블 신설
+3. **백엔드 스키마 #3**: votes 삭제, reactions 신설
+4. **점수 잡 재작성**: 새 공식 + replies unique-author 카운트
+5. **API 재작성**:
+   - reactions (POST/DELETE) for comment/reply
+   - replies CRUD
+   - RESULT 시 채팅 허용으로 정책 완화
+   - 진영 일치 검증 (mutation 시 user's comment.side 기준)
+6. **단위 테스트 갱신**: 새 점수 공식, reaction 토글, reply unique 카운트
+7. **Tailwind v4 마이그레이션** (config → CSS, postcss plugin 변경)
+8. **디자인 토큰 + globals.css** 이식
+9. **공통 컴포넌트 이식** (MobileShell, TeamPill, ScoreboardStrip, Top3 카드, SideGate, CommentBattle, Logo)
+10. **라우트 페이지 재작성** (홈, 이슈 상세, 로그인/가입)
+11. **어드민 다크 톤 리스킨** (기능 유지)
+12. **E2E 검증** + Railway 재배포
+
+## V2.6 명시적으로 미적용 (Out of Scope of V2)
+
+- 단일 메인 아레나 컨셉 (다수 이슈 목록 유지)
+- 비로그인 닉네임만으로 참전 (가입 강제 유지)
+- 카테고리 정치 외 활성화 (UI만 placeholder)
+- 어드민 LIVE 토글 (status는 자동 cron 전이 그대로)
+- 결과 발표 전용 페이지 (RESULT 상태에 배너만 추가)
+
