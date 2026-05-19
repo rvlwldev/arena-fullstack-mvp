@@ -1,3 +1,81 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+:root {
+  --arena-bg: #07070c;
+  --arena-panel: #0f1018;
+  --arena-red: #ff2b4a;
+  --arena-red-dim: #7a0f22;
+  --arena-blue: #2f7bff;
+  --arena-blue-dim: #0f2a6b;
+  --arena-glow-red: rgba(255, 43, 74, 0.55);
+  --arena-glow-blue: rgba(47, 123, 255, 0.55);
+  --arena-text: #f4f4f8;
+  --arena-muted: #9aa3b2;
+}
+
+@theme inline {
+  --color-arena-bg: var(--arena-bg);
+  --color-arena-panel: var(--arena-panel);
+  --color-arena-red: var(--arena-red);
+  --color-arena-blue: var(--arena-blue);
+  --color-arena-text: var(--arena-text);
+  --color-arena-muted: var(--arena-muted);
+}
+
+html, body {
+  background: var(--arena-bg);
+  color: var(--arena-text);
+}
+
+@keyframes arena-pulse-red {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 transparent); }
+  50%      { opacity: 0.85; filter: drop-shadow(0 0 12px var(--arena-glow-red)); }
+}
+
+@keyframes arena-pulse-blue {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 transparent); }
+  50%      { opacity: 0.85; filter: drop-shadow(0 0 12px var(--arena-glow-blue)); }
+}
+
+@keyframes hype-shake {
+  0%   { transform: translate(0, 0) scale(1); }
+  20%  { transform: translate(-2px, 1px) scale(1.02); }
+  40%  { transform: translate(2px, -1px) scale(1.04); }
+  60%  { transform: translate(-1px, -2px) scale(1.02); }
+  80%  { transform: translate(1px, 2px) scale(1.03); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@keyframes broadcast-onair-dot {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(255, 58, 94, 0.45), 0 0 6px 1px rgba(255, 58, 94, 0.35);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.92;
+    box-shadow: 0 0 0 3px rgba(255, 58, 94, 0.18), 0 0 12px 2px rgba(255, 58, 94, 0.42);
+    transform: scale(1.05);
+  }
+}
+
+.animate-hype-shake     { animation: hype-shake 0.45s ease-in-out; }
+.animate-live-blink     { animation: live-blink 1.1s ease-in-out infinite; }
+.animate-arena-pulse-red  { animation: arena-pulse-red 1.6s ease-in-out infinite; }
+.animate-arena-pulse-blue { animation: arena-pulse-blue 1.6s ease-in-out infinite; }
+.broadcast-onair-dot    { animation: broadcast-onair-dot 1.85s ease-in-out infinite; }
+
+.scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
