@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { and, asc, desc, eq, isNull, lt } from 'drizzle-orm'
 import { db, schema } from '@/app/_lib/db'
-import { requireUser } from '@/app/_lib/auth/session'
+import { activeBansByUserIds, requireActiveUser } from '@/app/_lib/auth/session'
 import { handle, fail, created, ok } from '@/app/_lib/http'
 import { deriveIssueStatus } from '@/app/_lib/domain/issue-status'
 import { broadcast } from '@/app/_lib/sse-hub'
@@ -32,13 +32,22 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       .orderBy(desc(schema.chats.id))
       .limit(limit)
 
-    return ok({ chats: rows.slice().reverse(), nextCursor: rows.at(-1)?.id ?? null })
+    const bans = await activeBansByUserIds(rows.map((r) => r.userId))
+    const enriched = rows.map((r) => {
+      const b = bans.get(r.userId)
+      return {
+        ...r,
+        ban: b ? { expiresAt: b.expiresAt, memo: b.memo } : null,
+      }
+    })
+
+    return ok({ chats: enriched.slice().reverse(), nextCursor: rows.at(-1)?.id ?? null })
   })
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const user = await requireUser()
+    const user = await requireActiveUser()
     const { id } = await ctx.params
     const body = postSchema.parse(await req.json())
 

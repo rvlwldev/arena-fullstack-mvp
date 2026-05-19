@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/app/_lib/db'
-import { requireUser } from '@/app/_lib/auth/session'
+import { requireActiveUser } from '@/app/_lib/auth/session'
 import { handle, fail, ok, noContent } from '@/app/_lib/http'
 import { deriveIssueStatus } from '@/app/_lib/domain/issue-status'
 import { canReact } from '@/app/_lib/domain/reaction'
@@ -47,7 +47,7 @@ async function broadcastCommentScore(commentId: string, issueId: string) {
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const user = await requireUser()
+    const user = await requireActiveUser()
     const { id: commentId } = await ctx.params
     const body = postSchema.parse(await req.json())
 

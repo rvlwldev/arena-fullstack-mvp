@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '@/app/_lib/db'
-import { requireUser } from '@/app/_lib/auth/session'
+import { requireActiveUser } from '@/app/_lib/auth/session'
 import { handle, fail, ok, noContent } from '@/app/_lib/http'
 import { canEditComment } from '@/app/_lib/domain/edit-window'
 import { deriveIssueStatus } from '@/app/_lib/domain/issue-status'
@@ -24,7 +24,7 @@ async function loadCommentWithIssue(commentId: string) {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const user = await requireUser()
+    const user = await requireActiveUser()
     const { id } = await ctx.params
     const { body } = patchSchema.parse(await req.json())
 
@@ -58,7 +58,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const user = await requireUser()
+    const user = await requireActiveUser()
     const { id } = await ctx.params
 
     const found = await loadCommentWithIssue(id)
