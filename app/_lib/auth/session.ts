@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { createHash, randomUUID } from 'crypto'
-import { and, desc, eq, gt, isNull } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '../db'
 import { env } from '../env'
 import { signAccessToken, signRefreshToken, verifyAccessToken } from './jwt'
@@ -41,19 +41,45 @@ export async function getCurrentUserWithBan(): Promise<CurrentUserWithBan | null
 /**
  * 로그인만 강제 (밴 상태여도 통과). banned 정보는 함께 반환.
  * mutation에서는 requireActiveUser()를 별도로 사용해야 함.
+ * users.banned_at + 최신 active sanction을 한 쿼리로 조회.
  */
 export async function requireUser(): Promise<CurrentUserWithBan> {
-  const user = await getCurrentUserWithBan()
-  if (!user) throw new HttpError(401, '로그인이 필요합니다.')
-  // 영구 비활성화(bannedAt)는 즉시 차단
-  const [u] = await db
-    .select({ bannedAt: schema.users.bannedAt })
-    .from(schema.users)
-    .where(eq(schema.users.id, user.id))
-    .limit(1)
-  if (!u) throw new HttpError(401, '사용자가 존재하지 않습니다.')
-  if (u.bannedAt) throw new HttpError(403, '영구 비활성화된 계정입니다.')
-  return user
+  const base = await getCurrentUser()
+  if (!base) throw new HttpError(401, '로그인이 필요합니다.')
+  const now = new Date()
+  const result = await db.execute(sql`
+    SELECT
+      u.banned_at,
+      s.starts_at  AS s_starts_at,
+      s.expires_at AS s_expires_at,
+      s.memo       AS s_memo
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT starts_at, expires_at, memo FROM sanctions
+      WHERE user_id = u.id AND lifted_at IS NULL AND expires_at > ${now}
+      ORDER BY expires_at DESC LIMIT 1
+    ) s ON TRUE
+    WHERE u.id = ${base.id}
+    LIMIT 1
+  `)
+  const row = result.rows[0] as
+    | {
+        banned_at: string | Date | null
+        s_starts_at: string | Date | null
+        s_expires_at: string | Date | null
+        s_memo: string | null
+      }
+    | undefined
+  if (!row) throw new HttpError(401, '사용자가 존재하지 않습니다.')
+  if (row.banned_at) throw new HttpError(403, '영구 비활성화된 계정입니다.')
+  const ban: BanInfo | null = row.s_expires_at
+    ? {
+        startsAt: new Date(row.s_starts_at as string | Date),
+        expiresAt: new Date(row.s_expires_at as string | Date),
+        memo: row.s_memo,
+      }
+    : null
+  return { ...base, ban }
 }
 
 /**
@@ -109,6 +135,7 @@ export async function activeBansByUserIds(userIds: string[]): Promise<Map<string
   const map = new Map<string, BanInfo>()
   if (userIds.length === 0) return map
   const now = new Date()
+  // DB에서 직접 좁히고 user별 최대 expires_at만 가져옴 (DISTINCT ON)
   const rows = await db
     .select({
       userId: schema.sanctions.userId,
@@ -119,14 +146,14 @@ export async function activeBansByUserIds(userIds: string[]): Promise<Map<string
     .from(schema.sanctions)
     .where(
       and(
+        inArray(schema.sanctions.userId, userIds),
         gt(schema.sanctions.expiresAt, now),
         isNull(schema.sanctions.liftedAt),
       ),
     )
+    .orderBy(desc(schema.sanctions.expiresAt))
   for (const r of rows) {
-    if (!userIds.includes(r.userId)) continue
-    const existing = map.get(r.userId)
-    if (!existing || existing.expiresAt < r.expiresAt) {
+    if (!map.has(r.userId)) {
       map.set(r.userId, { startsAt: r.startsAt, expiresAt: r.expiresAt, memo: r.memo })
     }
   }

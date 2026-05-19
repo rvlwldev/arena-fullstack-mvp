@@ -21,15 +21,29 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     const sideFilter = side === 'left' || side === 'right' ? side : null
 
+    // 1쿼리로 의견 + 집계: reactions/replies LEFT JOIN + GROUP BY
+    // (의견당 3 correlated subquery → 단일 패스)
     const result = await db.execute(sql`
       SELECT
         c.id, c.user_id, u.nickname, c.side, c.body, c.created_at, c.updated_at,
-        (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'empathy')  AS empathy,
-        (SELECT COUNT(*)::int FROM reactions r WHERE r.comment_id = c.id AND r.kind = 'dopamine') AS dopamine,
-        (SELECT COUNT(DISTINCT rp.user_id)::int FROM replies rp
-           WHERE rp.comment_id = c.id AND rp.parent_reply_id IS NULL AND rp.deleted_at IS NULL) AS rebuttal
+        COALESCE(rx.empathy, 0)  AS empathy,
+        COALESCE(rx.dopamine, 0) AS dopamine,
+        COALESCE(rb.rebuttal, 0) AS rebuttal
       FROM comments c
       JOIN users u ON u.id = c.user_id
+      LEFT JOIN (
+        SELECT comment_id,
+               COUNT(*) FILTER (WHERE kind = 'empathy')::int  AS empathy,
+               COUNT(*) FILTER (WHERE kind = 'dopamine')::int AS dopamine
+        FROM reactions WHERE comment_id IS NOT NULL
+        GROUP BY comment_id
+      ) rx ON rx.comment_id = c.id
+      LEFT JOIN (
+        SELECT comment_id, COUNT(DISTINCT user_id)::int AS rebuttal
+        FROM replies
+        WHERE parent_reply_id IS NULL AND deleted_at IS NULL
+        GROUP BY comment_id
+      ) rb ON rb.comment_id = c.id
       WHERE c.issue_id = ${id} AND c.deleted_at IS NULL
         ${sideFilter ? sql`AND c.side = ${sideFilter}` : sql``}
     `)

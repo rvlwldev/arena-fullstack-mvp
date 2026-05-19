@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
-import { db, schema } from '@/app/_lib/db'
-import { requireAdmin, activeBansByUserIds } from '@/app/_lib/auth/session'
+import { db } from '@/app/_lib/db'
+import { requireAdmin } from '@/app/_lib/auth/session'
 import { handle, ok } from '@/app/_lib/http'
 
 const PAGE_SIZE_DEFAULT = 20
@@ -9,6 +9,7 @@ const PAGE_SIZE_MAX = 50
 /**
  * GET /api/admin/users?q=&page=1&size=20
  * 정렬: 활성 ban 보유자 먼저 (만료 임박 순), 그 다음 가입 최신 순
+ * 한 쿼리로 사용자 + 활성 ban(expires_at, memo) 모두 조회 (LATERAL JOIN).
  */
 export async function GET(req: Request) {
   return handle(async () => {
@@ -20,31 +21,33 @@ export async function GET(req: Request) {
     const offset = (page - 1) * size
 
     const search = q ? `%${q.toLowerCase()}%` : null
+    const whereClause = search
+      ? sql`(LOWER(u.email) LIKE ${search} OR LOWER(u.nickname) LIKE ${search})`
+      : sql`TRUE`
 
-    const countResult = await db.execute(sql`
-      SELECT COUNT(*)::int AS total FROM users u
-      WHERE ${search ? sql`(LOWER(u.email) LIKE ${search} OR LOWER(u.nickname) LIKE ${search})` : sql`TRUE`}
-    `)
+    // count + rows를 분리하지만 두 쿼리는 병렬 처리
+    const [countResult, listResult] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*)::int AS total FROM users u WHERE ${whereClause}`),
+      db.execute(sql`
+        SELECT
+          u.id, u.email, u.nickname, u.role, u.created_at, u.banned_at,
+          s.expires_at AS ban_expires_at,
+          s.memo       AS ban_memo
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT expires_at, memo FROM sanctions
+          WHERE user_id = u.id AND lifted_at IS NULL AND expires_at > NOW()
+          ORDER BY expires_at DESC LIMIT 1
+        ) s ON TRUE
+        WHERE ${whereClause}
+        ORDER BY (s.expires_at IS NOT NULL) DESC, s.expires_at ASC NULLS LAST, u.created_at DESC
+        LIMIT ${size} OFFSET ${offset}
+      `),
+    ])
+
     const total = Number((countResult.rows[0] as { total: number })?.total ?? 0)
 
-    const result = await db.execute(sql`
-      SELECT
-        u.id, u.email, u.nickname, u.role, u.created_at, u.banned_at,
-        (
-          SELECT MAX(s.expires_at) FROM sanctions s
-          WHERE s.user_id = u.id AND s.lifted_at IS NULL AND s.expires_at > NOW()
-        ) AS ban_expires_at,
-        EXISTS (
-          SELECT 1 FROM sanctions s
-          WHERE s.user_id = u.id AND s.lifted_at IS NULL AND s.expires_at > NOW()
-        ) AS is_banned
-      FROM users u
-      WHERE ${search ? sql`(LOWER(u.email) LIKE ${search} OR LOWER(u.nickname) LIKE ${search})` : sql`TRUE`}
-      ORDER BY is_banned DESC, ban_expires_at ASC NULLS LAST, u.created_at DESC
-      LIMIT ${size} OFFSET ${offset}
-    `)
-
-    const users = result.rows.map((row) => {
+    const users = listResult.rows.map((row) => {
       const r = row as {
         id: string
         email: string
@@ -53,7 +56,7 @@ export async function GET(req: Request) {
         created_at: string | Date
         banned_at: string | Date | null
         ban_expires_at: string | Date | null
-        is_banned: boolean
+        ban_memo: string | null
       }
       return {
         id: r.id,
@@ -63,21 +66,13 @@ export async function GET(req: Request) {
         createdAt: new Date(r.created_at),
         bannedAt: r.banned_at ? new Date(r.banned_at) : null,
         banExpiresAt: r.ban_expires_at ? new Date(r.ban_expires_at) : null,
-        isBanned: Boolean(r.is_banned),
+        isBanned: Boolean(r.ban_expires_at),
+        banMemo: r.ban_memo,
       }
     })
 
-    // ban memo는 별도 호출로 채움 (간단)
-    const userIds = users.filter((u) => u.isBanned).map((u) => u.id)
-    const bans = await activeBansByUserIds(userIds)
-
-    const enriched = users.map((u) => ({
-      ...u,
-      banMemo: bans.get(u.id)?.memo ?? null,
-    }))
-
     return ok({
-      users: enriched,
+      users,
       page,
       size,
       total,

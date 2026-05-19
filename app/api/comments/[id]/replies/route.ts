@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { and, asc, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/app/_lib/db'
 import { requireActiveUser } from '@/app/_lib/auth/session'
 import { handle, fail, created, ok } from '@/app/_lib/http'
@@ -17,33 +17,48 @@ const postSchema = z.object({
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const { id: commentId } = await ctx.params
-    const empathySql = sql<number>`(SELECT COUNT(*)::int FROM ${schema.reactions} rr WHERE rr.reply_id = ${schema.replies.id} AND rr.kind = 'empathy')`
-    const dopamineSql = sql<number>`(SELECT COUNT(*)::int FROM ${schema.reactions} rr WHERE rr.reply_id = ${schema.replies.id} AND rr.kind = 'dopamine')`
-    const rows = await db
-      .select({
-        id: schema.replies.id,
-        commentId: schema.replies.commentId,
-        parentReplyId: schema.replies.parentReplyId,
-        userId: schema.replies.userId,
-        nickname: schema.users.nickname,
-        side: schema.replies.side,
-        body: schema.replies.body,
-        createdAt: schema.replies.createdAt,
-        empathy: empathySql,
-        dopamine: dopamineSql,
-      })
-      .from(schema.replies)
-      .innerJoin(schema.users, eq(schema.users.id, schema.replies.userId))
-      .where(and(eq(schema.replies.commentId, commentId), isNull(schema.replies.deletedAt)))
-      .orderBy(asc(schema.replies.createdAt))
+    // 답글당 2 correlated subquery → LEFT JOIN GROUP BY 한 번
+    const result = await db.execute(sql`
+      SELECT
+        rp.id, rp.comment_id, rp.parent_reply_id, rp.user_id, u.nickname,
+        rp.side, rp.body, rp.created_at,
+        COALESCE(rx.empathy, 0)  AS empathy,
+        COALESCE(rx.dopamine, 0) AS dopamine
+      FROM replies rp
+      JOIN users u ON u.id = rp.user_id
+      LEFT JOIN (
+        SELECT reply_id,
+               COUNT(*) FILTER (WHERE kind = 'empathy')::int  AS empathy,
+               COUNT(*) FILTER (WHERE kind = 'dopamine')::int AS dopamine
+        FROM reactions WHERE reply_id IS NOT NULL
+        GROUP BY reply_id
+      ) rx ON rx.reply_id = rp.id
+      WHERE rp.comment_id = ${commentId} AND rp.deleted_at IS NULL
+      ORDER BY rp.created_at ASC
+    `)
 
-    return ok({
-      replies: rows.map((r) => ({
-        ...r,
-        empathy: Number(r.empathy),
-        dopamine: Number(r.dopamine),
-      })),
+    const replies = result.rows.map((r) => {
+      const row = r as {
+        id: string; comment_id: string; parent_reply_id: string | null
+        user_id: string; nickname: string
+        side: 'left' | 'right'; body: string
+        created_at: string | Date; empathy: number; dopamine: number
+      }
+      return {
+        id: row.id,
+        commentId: row.comment_id,
+        parentReplyId: row.parent_reply_id,
+        userId: row.user_id,
+        nickname: row.nickname,
+        side: row.side,
+        body: row.body,
+        createdAt: new Date(row.created_at),
+        empathy: Number(row.empathy),
+        dopamine: Number(row.dopamine),
+      }
     })
+
+    return ok({ replies })
   })
 }
 

@@ -12,8 +12,13 @@ function getPool(): Pool {
   if (!globalThis.__pgPool) {
     globalThis.__pgPool = new Pool({
       connectionString: env().DATABASE_URL,
-      max: 8,
-      idleTimeoutMillis: 30_000,
+      // Railway Free Plan(1 vCPU/0.5GB) 환경에서 안정적인 풀 크기
+      max: 5,
+      // 짧은 idle 정리 + connection retry 단축
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 5_000,
+      // statement 타임아웃 (각 쿼리는 10초 내 끝나야 함)
+      statement_timeout: 10_000,
     })
   }
   return globalThis.__pgPool

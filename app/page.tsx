@@ -1,57 +1,82 @@
 import Link from 'next/link'
-import { desc, inArray, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { AppShell } from './_components/AppShell'
 import { Card, Pill, StatNumber, StatusBadge } from './_components/ui'
 import { TeamPill } from './_components/TeamPill'
-import { db, schema } from './_lib/db'
-import { deriveIssueStatus } from './_lib/domain/issue-status'
+import { db } from './_lib/db'
+import { deriveIssueStatus, type IssueStatus } from './_lib/domain/issue-status'
 import { formatCountKR, elapsedSecondsSince, formatHHMMSS } from './_lib/format'
 
 export const dynamic = 'force-dynamic'
 
-interface IssueStat {
+interface IssueListRow {
+  id: string
+  title: string
+  sideALabel: string
+  sideBLabel: string
+  opensAt: Date
+  closesAt: Date
+  resultAt: Date
+  status: IssueStatus
   participants: number
   comments: number
   reactions: number
 }
 
-async function loadIssueStats(ids: string[]): Promise<Map<string, IssueStat>> {
-  const map = new Map<string, IssueStat>()
-  if (ids.length === 0) return map
+async function loadIssuesWithStats(): Promise<IssueListRow[]> {
+  // 단일 쿼리: 이슈 + 참가/댓글/반응 집계
+  // - participants: comments/chats user_id UNION DISTINCT
+  // - comments: 활성 의견 수
+  // - reactions: 의견·답글에 달린 reaction 수
   const result = await db.execute(sql`
     SELECT
-      i.id,
-      (SELECT COUNT(DISTINCT u)::int FROM (
-        SELECT user_id AS u FROM comments WHERE issue_id = i.id AND deleted_at IS NULL
-        UNION
-        SELECT user_id AS u FROM chats WHERE issue_id = i.id AND deleted_at IS NULL
-      ) AS p) AS participants,
-      (SELECT COUNT(*)::int FROM comments WHERE issue_id = i.id AND deleted_at IS NULL) AS comments,
-      (
-        (SELECT COUNT(*)::int FROM reactions r JOIN comments c ON c.id = r.comment_id WHERE c.issue_id = i.id) +
-        (SELECT COUNT(*)::int FROM reactions r JOIN replies rp ON rp.id = r.reply_id JOIN comments c ON c.id = rp.comment_id WHERE c.issue_id = i.id)
-      ) AS reactions
-    FROM issues i WHERE i.id = ANY(${sql.raw(`ARRAY[${ids.map((id) => `'${id}'`).join(',')}]::uuid[]`)})
+      i.id, i.title, i.side_a_label, i.side_b_label,
+      i.opens_at, i.closes_at, i.result_at, i.status,
+      COALESCE(stat.participants, 0) AS participants,
+      COALESCE(stat.comments, 0)     AS comments,
+      COALESCE(stat.reactions, 0)    AS reactions
+    FROM issues i
+    LEFT JOIN LATERAL (
+      SELECT
+        (SELECT COUNT(DISTINCT u)::int FROM (
+          SELECT user_id AS u FROM comments WHERE issue_id = i.id AND deleted_at IS NULL
+          UNION
+          SELECT user_id AS u FROM chats    WHERE issue_id = i.id AND deleted_at IS NULL
+        ) p) AS participants,
+        (SELECT COUNT(*)::int FROM comments WHERE issue_id = i.id AND deleted_at IS NULL) AS comments,
+        (
+          (SELECT COUNT(*)::int FROM reactions r JOIN comments c ON c.id = r.comment_id WHERE c.issue_id = i.id) +
+          (SELECT COUNT(*)::int FROM reactions r JOIN replies rp ON rp.id = r.reply_id JOIN comments c ON c.id = rp.comment_id WHERE c.issue_id = i.id)
+        ) AS reactions
+    ) stat ON TRUE
+    WHERE i.status IN ('ACTIVE', 'RESULT')
+    ORDER BY i.created_at DESC
   `)
-  for (const row of result.rows) {
-    const r = row as { id: string; participants: number; comments: number; reactions: number }
-    map.set(r.id, {
+  return result.rows.map((row) => {
+    const r = row as {
+      id: string; title: string; side_a_label: string; side_b_label: string
+      opens_at: string | Date; closes_at: string | Date; result_at: string | Date
+      status: IssueStatus
+      participants: number; comments: number; reactions: number
+    }
+    return {
+      id: r.id,
+      title: r.title,
+      sideALabel: r.side_a_label,
+      sideBLabel: r.side_b_label,
+      opensAt: new Date(r.opens_at),
+      closesAt: new Date(r.closes_at),
+      resultAt: new Date(r.result_at),
+      status: r.status,
       participants: Number(r.participants),
       comments: Number(r.comments),
       reactions: Number(r.reactions),
-    })
-  }
-  return map
+    }
+  })
 }
 
 export default async function HomePage() {
-  const rows = await db
-    .select()
-    .from(schema.issues)
-    .where(inArray(schema.issues.status, ['ACTIVE', 'RESULT']))
-    .orderBy(desc(schema.issues.createdAt))
-
-  const stats = await loadIssueStats(rows.map((r) => r.id))
+  const rows = await loadIssuesWithStats()
   const now = new Date()
 
   return (
@@ -73,7 +98,6 @@ export default async function HomePage() {
         <ul className="mt-6 space-y-3">
           {rows.map((r) => {
             const status = deriveIssueStatus(now, r)
-            const st = stats.get(r.id) ?? { participants: 0, comments: 0, reactions: 0 }
             const elapsed = elapsedSecondsSince(r.opensAt)
             return (
               <li key={r.id}>
@@ -98,9 +122,9 @@ export default async function HomePage() {
                       </div>
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-2">
-                      <StatNumber label="참가" value={formatCountKR(st.participants)} />
-                      <StatNumber label="댓글" value={formatCountKR(st.comments)} />
-                      <StatNumber label="반응" value={formatCountKR(st.reactions)} />
+                      <StatNumber label="참가" value={formatCountKR(r.participants)} />
+                      <StatNumber label="댓글" value={formatCountKR(r.comments)} />
+                      <StatNumber label="반응" value={formatCountKR(r.reactions)} />
                     </div>
                   </Card>
                 </Link>

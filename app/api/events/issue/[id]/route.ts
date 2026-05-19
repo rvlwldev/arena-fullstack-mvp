@@ -31,13 +31,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       subscribe(id, client, req.signal)
       send('hello', { issueId: id })
 
+      // Railway/proxy idle timeout(보통 60~120s)보다 짧게, 너무 잦지 않게
       const heartbeat = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(`event: ping\ndata: ${Date.now()}\n\n`))
         } catch {
           clearInterval(heartbeat)
         }
-      }, 25_000)
+      }, 45_000)
 
       req.signal.addEventListener('abort', () => {
         clearInterval(heartbeat)
